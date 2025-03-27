@@ -133,7 +133,7 @@ def _handle_openai_normal_image_response(image_str: str,model: str,finish_reason
 def _extract_result(response: Dict[str, Any], model: str, stream: bool = False, gemini_format: bool = False) -> tuple[str, List[Dict[str, Any]]]:
     text, tool_calls = "", []
     if stream:
-        if response.get("candidates"):
+        if response.get("candidates") and len(response["candidates"]) > 0:
             candidate = response["candidates"][0]
             content = candidate.get("content", {})
             parts = content.get("parts", [])
@@ -160,7 +160,7 @@ def _extract_result(response: Dict[str, Any], model: str, stream: bool = False, 
             text = _add_search_link_text(model, candidate, text)
             tool_calls = _extract_tool_calls(parts, gemini_format)
     else:
-        if response.get("candidates"):
+        if response.get("candidates") and len(response["candidates"]) > 0:
             candidate = response["candidates"][0]
             if "thinking" in model:
                 if settings.SHOW_THINKING_PROCESS:
@@ -191,6 +191,10 @@ def _extract_result(response: Dict[str, Any], model: str, stream: bool = False, 
             text = _add_search_link_text(model, candidate, text)
             tool_calls = _extract_tool_calls(candidate["content"]["parts"], gemini_format)
         else:
+            if not response.get("candidates"):
+                raise ValueError("No candidates in response")
+            if len(response["candidates"]) == 0:
+                raise ValueError("Empty candidates array")
             if settings.SECOND_MODEL and model != settings.SECOND_MODEL:
                 raise ValueError("No valid response, will retry with second model")
             raise ValueError("No valid response")

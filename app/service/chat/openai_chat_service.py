@@ -188,6 +188,22 @@ class OpenAIChatService:
         self, model: str, payload: Dict[str, Any], api_key: str
     ) -> Dict[str, Any]:
         """处理普通聊天完成"""
+        original_model = model
+        if settings.SECOND_MODEL and model != settings.SECOND_MODEL:
+            try:
+                # 先尝试主模型
+                response = await self.api_client.generate_content(payload, model, api_key)
+                return self.response_handler.handle_response(
+                    response, model, stream=False, finish_reason="stop"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"Primary model {model} failed: {str(e)}, switching to secondary model: {settings.SECOND_MODEL}"
+                )
+                model = settings.SECOND_MODEL
+                payload["model"] = model  # 确保payload中的模型也更新
+
+        # 使用主模型或回退后的模型
         response = await self.api_client.generate_content(payload, model, api_key)
         return self.response_handler.handle_response(
             response, model, stream=False, finish_reason="stop"

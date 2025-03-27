@@ -10,6 +10,7 @@ class ChatRequest(BaseModel):
     temperature: Optional[float] = DEFAULT_TEMPERATURE
     stream: Optional[bool] = False
     tools: Optional[List[dict]] = []
+    moderation: Optional[bool] = False
     max_tokens: Optional[int] = DEFAULT_MAX_TOKENS
     top_p: Optional[float] = DEFAULT_TOP_P
     top_k: Optional[int] = DEFAULT_TOP_K
