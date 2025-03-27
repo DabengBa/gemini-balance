@@ -1,5 +1,5 @@
 import asyncio
-from itertools import cycle
+import random
 from typing import Dict
 
 from app.config.config import settings
@@ -11,7 +11,7 @@ logger = get_key_manager_logger()
 class KeyManager:
     def __init__(self, api_keys: list):
         self.api_keys = api_keys
-        self.key_cycle = cycle(api_keys)
+        self.keys_list = api_keys.copy()
         self.key_cycle_lock = asyncio.Lock()
         self.failure_count_lock = asyncio.Lock()
         self.key_failure_counts: Dict[str, int] = {key: 0 for key in api_keys}
@@ -22,9 +22,9 @@ class KeyManager:
         return self.paid_key
 
     async def get_next_key(self) -> str:
-        """获取下一个API key"""
+        """随机选择一个API key"""
         async with self.key_cycle_lock:
-            return next(self.key_cycle)
+            return random.choice(self.keys_list)
 
     async def is_key_valid(self, key: str) -> bool:
         """检查key是否有效"""
@@ -48,7 +48,7 @@ class KeyManager:
 
             current_key = await self.get_next_key()
             if current_key == initial_key:
-                # await self.reset_failure_counts() 取消重置
+                # 随机模式下不再检查完整循环
                 return current_key
 
     async def handle_api_failure(self, api_key: str) -> str:

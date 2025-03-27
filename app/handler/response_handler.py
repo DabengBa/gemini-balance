@@ -191,7 +191,9 @@ def _extract_result(response: Dict[str, Any], model: str, stream: bool = False, 
             text = _add_search_link_text(model, candidate, text)
             tool_calls = _extract_tool_calls(candidate["content"]["parts"], gemini_format)
         else:
-            text = "暂无返回"
+            if settings.SECOND_MODEL and model != settings.SECOND_MODEL:
+                raise ValueError("No valid response, will retry with second model")
+            raise ValueError("No valid response")
     return text, tool_calls
 
 def _extract_image_data(part: dict) -> str:

@@ -198,60 +198,62 @@ class OpenAIChatService:
     ) -> AsyncGenerator[str, None]:
         """处理流式聊天完成，添加重试逻辑"""
         retries = 0
-        max_retries = 3
-        while retries < max_retries:
+        original_model = model
+        if settings.SECOND_MODEL and model != settings.SECOND_MODEL:
             try:
-                tool_call_flag = False
+                # 先尝试主模型
                 async for line in self.api_client.stream_generate_content(
                     payload, model, api_key
                 ):
-                    # print(line)
-                    if line.startswith("data:"):
-                        chunk = json.loads(line[6:])
-                        openai_chunk = self.response_handler.handle_response(
-                            chunk, model, stream=True, finish_reason=None
-                        )
-                        if openai_chunk:
-                            # 提取文本内容
-                            text = self._extract_text_from_openai_chunk(openai_chunk)
-                            if text:
-                                # 使用流式输出优化器处理文本输出
-                                async for (
-                                    optimized_chunk
-                                ) in openai_optimizer.optimize_stream_output(
-                                    text,
-                                    lambda t: self._create_char_openai_chunk(
-                                        openai_chunk, t
-                                    ),
-                                    lambda c: f"data: {json.dumps(c)}\n\n",
-                                ):
-                                    yield optimized_chunk
-                            else:
-                                # 如果没有文本内容（如工具调用等），整块输出
-                                if "tool_calls" in json.dumps(openai_chunk):
-                                    tool_call_flag = True
-                                yield f"data: {json.dumps(openai_chunk)}\n\n"
-                if tool_call_flag:
-                    yield f"data: {json.dumps(self.response_handler.handle_response({}, model, stream=True, finish_reason='tool_calls'))}\n\n"
-                else:
-                    yield f"data: {json.dumps(self.response_handler.handle_response({}, model, stream=True, finish_reason='stop'))}\n\n"
-                yield "data: [DONE]\n\n"
-                logger.info("Streaming completed successfully")
-                break  # 成功后退出循环
+                    yield line
+                return
             except Exception as e:
-                retries += 1
                 logger.warning(
-                    f"Streaming API call failed with error: {str(e)}. Attempt {retries} of {max_retries}"
+                    f"Primary model {model} failed: {str(e)}, switching to secondary model: {settings.SECOND_MODEL}"
                 )
-                api_key = await self.key_manager.handle_api_failure(api_key)
-                logger.info(f"Switched to new API key: {api_key}")
-                if retries >= max_retries:
-                    logger.error(
-                        f"Max retries ({max_retries}) reached for streaming. Raising error"
+                model = settings.SECOND_MODEL
+                payload["model"] = model  # 确保payload中的模型也更新
+                
+        try:
+            tool_call_flag = False
+            async for line in self.api_client.stream_generate_content(
+                payload, model, api_key
+            ):
+                if line.startswith("data:"):
+                    chunk = json.loads(line[6:])
+                    openai_chunk = self.response_handler.handle_response(
+                        chunk, model, stream=True, finish_reason=None
                     )
-                    yield f"data: {json.dumps({'error': 'Streaming failed after retries'})}\n\n"
-                    yield "data: [DONE]\n\n"
-                    break
+                    if openai_chunk:
+                        # 提取文本内容
+                        text = self._extract_text_from_openai_chunk(openai_chunk)
+                        if text:
+                            # 使用流式输出优化器处理文本输出
+                            async for (
+                                optimized_chunk
+                            ) in openai_optimizer.optimize_stream_output(
+                                text,
+                                lambda t: self._create_char_openai_chunk(
+                                    openai_chunk, t
+                                ),
+                                lambda c: f"data: {json.dumps(c)}\n\n",
+                            ):
+                                yield optimized_chunk
+                        else:
+                            # 如果没有文本内容（如工具调用等），整块输出
+                            if "tool_calls" in json.dumps(openai_chunk):
+                                tool_call_flag = True
+                            yield f"data: {json.dumps(openai_chunk)}\n\n"
+            if tool_call_flag:
+                yield f"data: {json.dumps(self.response_handler.handle_response({}, model, stream=True, finish_reason='tool_calls'))}\n\n"
+            else:
+                yield f"data: {json.dumps(self.response_handler.handle_response({}, model, stream=True, finish_reason='stop'))}\n\n"
+            yield "data: [DONE]\n\n"
+            logger.info("Streaming completed successfully")
+        except Exception as e:
+            logger.error(f"Streaming API call failed with error: {str(e)}")
+            yield f"data: {json.dumps({'error': 'Streaming failed'})}\n\n"
+            yield "data: [DONE]\n\n"
 
     async def create_image_chat_completion(
         self,

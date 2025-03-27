@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     SEARCH_MODELS: List[str] = ["gemini-2.0-flash-exp"]
     IMAGE_MODELS: List[str] = ["gemini-2.0-flash-exp"]
     FILTERED_MODELS: List[str] = DEFAULT_FILTER_MODELS
+    SECOND_MODEL: str = "gemini-2.0-flash"
     TOOLS_CODE_EXECUTION_ENABLED: bool = False
     SHOW_SEARCH_LINK: bool = True
     SHOW_THINKING_PROCESS: bool = True
