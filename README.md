@@ -3,7 +3,7 @@
 1. "重试"逻辑改为"切换模型重试"
 2. 适配Huggingface.
 3. 去掉了Gemini原生接口
-4. 随机使用API KEY （因此不使用max failure逻辑, 而是在失败后冻结该API KEY 10分钟)
+4. 随机使用API KEY （因此后续计划不使用max failure逻辑, 而是在失败后冻结该API KEY 10分钟)
 
 # Huggingface部署
 
